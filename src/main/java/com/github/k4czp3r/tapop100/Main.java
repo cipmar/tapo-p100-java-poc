@@ -8,16 +8,20 @@ import java.util.Optional;
 import java.util.Properties;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.github.k4czp3r.tapop100.domain.HandshakeResponse;
 import com.github.k4czp3r.tapop100.domain.KspKeyPair;
-import com.github.k4czp3r.tapop100.helpers.KspDebug;
 import com.google.gson.JsonObject;
 
 
 public class Main {
 
+	private final static Logger LOG = LoggerFactory.getLogger(Main.class);
+
 	public static void main(String[] args) throws Exception {
+
 		Properties prop = new Properties();
 		File f = new File("tapop100.properties");
 
@@ -25,7 +29,7 @@ public class Main {
 			boolean newFile = f.createNewFile();
 
 			if (newFile) {
-				KspDebug.out("new tapop100.properties file created");
+				LOG.debug("new tapop100.properties file created");
 			}
 		}
 
@@ -38,13 +42,15 @@ public class Main {
 		Optional<String> maybePassword = Optional.ofNullable(prop.getProperty("password")).filter(s -> !s.equals("null"));
 
 		if (maybeIP.isEmpty()) {
-			System.out.println("No IP of PowerPlug specified. Please adjust tapop100.properties");
+			LOG.warn("No IP of PowerPlug specified. Please adjust tapop100.properties");
 		}
+
 		if (maybeEmail.isEmpty()) {
-			System.out.println("No TP-Email-Address specified. Please adjust tapop100.properties");
+			LOG.warn("No TP-Email-Address specified. Please adjust tapop100.properties");
 		}
+
 		if (maybePassword.isEmpty()) {
-			System.out.println("No Password for the Email-Address specified. Please adjust tapop100.properties");
+			LOG.warn("No Password for the Email-Address specified. Please adjust tapop100.properties");
 		}
 
 		prop.put("ip", maybeIP.orElse("null"));
@@ -56,7 +62,7 @@ public class Main {
 		}
 
 		if (maybeIP.isEmpty() || maybeEmail.isEmpty() || maybePassword.isEmpty()) {
-			System.out.println("script not configured, please adjust tapop100.properties and try again");
+			LOG.warn("script not configured, please adjust tapop100.properties and try again");
 			System.exit(1);
 		}
 
@@ -75,13 +81,13 @@ public class Main {
 		boolean enabled = Boolean.parseBoolean(args[0]);
 
 		Security.addProvider(new BouncyCastleProvider());
-		KspDebug.out("Generating keypair...");
+		LOG.info("Generating keypair...");
 		TapoFlow tapoFlow = new TapoFlow(ip);
 
 		KspKeyPair kspKeyPair = KspEncryption.generateKeyPair();
 
 
-		KspDebug.out("Sending handshake!");
+		LOG.info("Sending handshake...");
 		HandshakeResponse handshakeResponse = tapoFlow.makeHandshake(kspKeyPair);
 		if (handshakeResponse == null) {
 			System.exit(1);
@@ -89,20 +95,20 @@ public class Main {
 
 
 		String keyFromTapo = handshakeResponse.getResponse().getAsJsonObject("result").get("key").getAsString();
-		KspDebug.out("Tapo's key is: " + keyFromTapo);
-		KspDebug.out("Our session cookie is: " + handshakeResponse.getCookie());
+		LOG.debug("Tapo's key is: " + keyFromTapo);
+		LOG.debug("Our session cookie is: " + handshakeResponse.getCookie());
 
-		KspDebug.out("Will try to decode it!");
+		LOG.info("Decoding key...");
 		C658a c658a = KspEncryption.decodeTapoKey(keyFromTapo, kspKeyPair);
 		if (c658a == null) {
 			System.exit(1);
 		}
-		KspDebug.out("Decoded!");
+		LOG.info("Decoded!");
 
-		KspDebug.out("Will try to login!");
+		LOG.info("Logging in...");
 		JsonObject resp = tapoFlow.loginRequest(email, password, c658a, handshakeResponse.getCookie());
 		String token = resp.getAsJsonObject("result").get("token").getAsString();
-		KspDebug.out("Got token: " + token);
+		LOG.debug("Got token: " + token);
 
 		tapoFlow.setPlugState(c658a, token, handshakeResponse.getCookie(), enabled);
 	}
