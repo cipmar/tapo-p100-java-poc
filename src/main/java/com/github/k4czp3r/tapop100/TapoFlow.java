@@ -81,7 +81,7 @@ public class TapoFlow {
 			LOG.debug("Server response: " + respBody);
 			LOG.debug("Decrypted: " + dec);
 
-			LOG.info("Plug state set successfully!");
+			LOG.info("Plug state set successfully to {}!\n", on);
 		} catch (Exception ex) {
 			LOG.error("Something went wrong! " + ex.getMessage());
 		}
